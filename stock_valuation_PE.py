@@ -4,124 +4,152 @@ import requests
 import pandas as pd
 import re
 
-#"零售":{"LULU","GPS","COST","PG","KR","JWN","NKE","DG","FL"}
-# "航空郵輪":{"AAL","LUV","DAL","UAL","BA","CCL","RCL"},"銀行":{"BAC","JPM","GS","C","WFC","BLK"},
-# "傳統":{"DIS","CAT","GE","MMM","WM","ETN","ISRG","UNH","ABBV","CVS"},"支付":{"MA","V","PYPL","AXP"}
-# ,"食品":{"MCD","SBUX","KO","PEP","CMG","YUM"},"半導體":{"TSM","AMD","QCOM","MU","INTC","ASML"}} 
-company ={"大科技":{"GOOG","META","AMZN","NFLX","AAPL","MSFT"}}
+company ={
+"大科技":{"GOOG","META","AMZN","NFLX","AAPL","MSFT","TSLA","NVDA"},
+"航空郵輪":{"AAL","LUV","DAL","UAL","ALK","BA","EADSY","CCL","RCL"},
+"銀行":{"BAC","JPM","GS","C","WFC","BLK"},
+"傳統":{"DIS","CAT","GE","HD","MMM","WM","ETN","ISRG","UNH","ABBV","CVS","DE"},
+"支付":{"MA","V","PYPL","AXP"},
+"零售":{"LULU","GPS","COST","PG","KR","JWN","NKE","DG","FL","LVMHF","EL","PVH","TPR"},
+"食品":{"MCD","SBUX","KO","PEP","CMG","YUM"},
+"半導體":{"TSM","AMD","QCOM","MU","INTC","ASML","SWKS","QRVO","AVGO","AMAT"},
+"原油":{"CVX","VLO","COP","XOM","OXY","CPE","ENB"},
+"旅遊":{"BKNG","EXPE","MAR","HLT","ABNB","H","WYNN","IHG","LVS","MGM"}} 
 
 ind = [17,0,1,2,3,5,4,6,7,8,9,10,11,12,14,13,16,15,18,19,20]
 col = ["市值","本季", "下一季", "本年度","下一年","後五年","前五年","預估PE","23年EPS","23年合理價","24年EPS","24年合理價","五年PE MIN"
 ,"五年PE MEDIAN","五年PE MAX","五年PE最低價","五年PE中位價","五年PE最高價","股價","估值","相差百分比"]
-
-f = pd.DataFrame()
-ser = pd.Series(col,index = ind)
-f["股票代號"] = ser
-
-headers ={
-            "user-agent": 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36'
-}
-
-for industry,company_group in company.items():
+path =  "/Users/yankesswang/Downloads/Industry_PE_Evaluation_2023.xlsx"
+with pd.ExcelWriter(path) as writer:
+    for key,value in company.items():
+        ser = pd.Series(col,index = ind)
+        f = pd.DataFrame()
+        f["股票代號"] = ser
     
-    for company_name in company_group:
+        for ing in value:
 
-        #從yahoo fiance抓取數據
-        web = "https://hk.finance.yahoo.com/quote/" +company_name + "/analysis?p=" +company_name #從Yahooo Finance抓取23年和24年EPS
-        res = requests.get(web, headers = headers)
-        res.encoding = ("utf-8")
-    
-        soup = BeautifulSoup(res.text, 'html.parser')
-        data = soup.select_one('#Col1-0-AnalystLeafPage-Proxy')
 
-        dfs = pd.read_html(data.prettify())
-        earning_23 = dfs[0]["本年度  (2023)"][2]
-        earning_24 = dfs[0]["下一年  (2024)"][2] #從Yahooo Finance抓取分析師預期增長率
-        
-        stock = pd.DataFrame((dfs[5])[["預計增長", company_name]], index = ind)
-        
-        stock = stock.rename(columns={"預計增長":"股票代號"})
+            headers ={
+                "user-agent": 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36'
+            }
 
-        stock.loc[4, "股票代號"]="後五年"     
-        stock.loc[5, "股票代號"]="前五年"
-
-        stock.loc[6, "股票代號"] = "預估PE"
-        stock.loc[6, company_name] = round(float(stock.loc[4, company_name].replace("%","")) *2)
-
-        stock.loc[7, "股票代號"] = "23年EPS" 
-        stock.loc[7, company_name] = float(earning_23)  
-
-        stock.loc[8, "股票代號"] = "23年合理價"     #價值=23年EPS*PE中位數
-        stock.loc[8, company_name] = round(stock.loc[7, company_name] * stock.loc[6, company_name])
-
-        stock.loc[9, "股票代號"] = "24年EPS"
-        stock.loc[9, company_name] = float(earning_24) 
-
-        stock.loc[10, "股票代號"] = "24年合理價"  
-        stock.loc[10, company_name] = round(stock.loc[9, company_name] * stock.loc[6, company_name])
+            web = "https://hk.finance.yahoo.com/quote/" +ing + "/analysis?p=" +ing #從Yahooo Finance抓取23年和24年EPS
+            res = requests.get(web, headers = headers)
+            res.encoding = ("utf-8")
         
 
-        web1 = "https://ycharts.com/companies/"+company_name+"/pe_ratio" #從ychart抓取公司過去五年度avg and median PE
-        res1 = requests.get(web1, headers = headers)
-        res1.encoding = ("utf-8")
-        soup1 = BeautifulSoup(res1.text, 'html.parser')
-        data1 = soup1.select(".key-stat")
+            soup = BeautifulSoup(res.text, 'html.parser')
+            data = soup.select_one('#Col1-0-AnalystLeafPage-Proxy')
+            dfs = pd.read_html(data.prettify())
+            if "本年度  (2023)" in dfs[0]:
+                earning_23 = dfs[0]["本年度  (2023)"][2]
+                earning_24 = dfs[0]["下一年  (2024)"][2]
+            elif "本年度  (2024)" in dfs[0]:
+                earning_23 = dfs[0]["本年度  (2024)"][2]
+                earning_24 = dfs[0]["下一年  (2025)"][2]
+            else:
+                print(ing+'bug')
+                continue
+            
+            stock = pd.DataFrame((dfs[5])[["預計增長", ing]], index = ind)
+            
+            stock = stock.rename(columns={"預計增長":"股票代號"})
 
-        string = "".join([data1[i].getText() for i in range(len(data1))]).replace(" ", "")
-        num = re.findall('-?\d+\.?\d*', string)
-        PE_group = list(map(lambda x: round(float(x)), num))
-        PE_group = [x for x in PE_group if len(str(x)) <= 4] #爬取過去五年公司PE數據
+            stock["股票代號"][4]="後五年"     #從Yahooo Finance抓取分析師預期增長率
+            stock["股票代號"][5]="前五年"
 
+            stock["股票代號"][6] = "預估PE"
+            stock[ing][6] = round(float(stock[ing][4].replace("%","")) *2)
 
-       
-        stock.loc[11, "股票代號"] = "五年PE MIN"
-        stock.loc[11, company_name] = PE_group[0]
+            stock["股票代號"][7] = "23年EPS" 
+            stock[ing][7] = float(earning_23)  
 
-        stock.loc[12, "股票代號"] = "五年PE MAX"
-        stock.loc[12, company_name] = PE_group[1]
+            stock["股票代號"][8] = "23年合理價"
+            stock[ing][8] = round(stock[ing][7] * stock[ing][6])
 
-        stock.loc[13, "股票代號"] = "五年PE MEDIAN"
-        stock.loc[13, company_name] = PE_group[3]
+            stock["股票代號"][9] = "24年EPS"
+            stock[ing][9] = float(earning_24) 
 
-        stock.loc[14, "股票代號"] = "五年PE最低價"
-        stock.loc[14, company_name] = round(stock.loc[11, company_name]*stock.loc[7, company_name])
+            stock["股票代號"][10] = "24年合理價"  
+            stock[ing][10] = round(stock[ing][9] * stock[ing][6])
+            
 
-        stock.loc[15, "股票代號"] = "五年PE最高價"
-        stock.loc[15, company_name] = round(stock.loc[12, company_name]*stock.loc[7, company_name])
-    
-        stock.loc[16, "股票代號"] = "五年PE中位價"
-        stock.loc[16, company_name] = round(stock.loc[13, company_name]*stock.loc[7, company_name])
+            web1 = "https://ycharts.com/companies/"+ing+"/pe_ratio" #從ychart抓取公司過去五年度avg and median PE
+            res1 = requests.get(web1, headers = headers)
+            res1.encoding = ("utf-8")
 
+            soup1 = BeautifulSoup(res1.text, 'html.parser')
+            data1 = soup1.select(".key-stat")
 
-        web2 = "https://hk.finance.yahoo.com/quote/"+company_name+"?p="+company_name+"&.tsrc=fin-srch"
-        res2 = requests.get(web2, headers = headers)
-        res2.encoding = ("utf-8")
+            string = " "
+            for i in range(len(data1)):
+                string += data1[i].getText()
+            string= string.replace(" ","")
 
-        soup2 = BeautifulSoup(res2.text, 'html.parser') #抓取股票的市值和股價
-        data2 = soup2.select_one('#quote-summary')
-        dfs2 = pd.read_html(data2.prettify())
-
-        stock.loc[17, "股票代號"]= "市值"
-        stock.loc[17, company_name] = dfs2[1][1][0]
-        stock.loc[18, "股票代號"] = "股價"
-        stock.loc[18, company_name] = float(dfs2[0][1][0])
-
-        stock.loc[19, "股票代號"] = "股價與估值比較"
-        if stock.loc[18, company_name] > stock.loc[16, company_name]:  #與現有股價進行比對，檢視股票為高估或是低估
-            stock.loc[19, company_name] = "高估"
-        else:
-            stock.loc[19, company_name] = "低估"
-
-        stock.loc[20, "股票代號"] = "相差百分比"   #計算股價高估或低估的百分比
-        stock.loc[20, company_name] = str(round(100*(stock[company_name][16]- stock[company_name][18])/stock[company_name][16]))+"%"
-    
-        f= pd.merge(f,stock) #把每家公司的資料合併
-
+            num = re.findall('-?\d+\.?\d*',string)
+            final =[]
+            for i in range(len(num)):
+                res = round(float(num[i]))
+                if(len(str(res)) <= 4):
+                    final.append(res)
         
+
+            stock["股票代號"][11] = "五年PE MIN"
+            stock[ing][11] = final[0]
+
+            stock["股票代號"][12] = "五年PE 平均"
+            stock[ing][12] = final[2]
+
+            
+
+            stock["股票代號"][13] = "五年PE MEDIAN"
+            stock[ing][13] = final[3]
+
+            stock["股票代號"][14] = "五年PE最低價"
+            stock[ing][14] = round(stock[ing][11]*stock[ing][7])
+
+            stock["股票代號"][15] = "五年PE平均價"
+            stock[ing][15] = round(stock[ing][12]*stock[ing][7])
         
-    file = industry+"23年 PE估值表.csv"  #將所有資料整合為csv檔輸出
-    f.to_csv(file, encoding='big5')
-    print(f)
-    
+            stock["股票代號"][16] = "五年PE中位價"
+            stock[ing][16] = round(stock[ing][13]*stock[ing][7])
+
+
+            web2 = "https://hk.finance.yahoo.com/quote/"+ing+"?p="+ing+"&.tsrc=fin-srch"
+            res2 = requests.get(web2, headers = headers)
+            res2.encoding = ("utf-8")
+
+
+
+            soup2 = BeautifulSoup(res2.text, 'html.parser')
+            data2 = soup2.select_one('#quote-summary')
+            dfs2 = pd.read_html(data2.prettify())
+
+            stock["股票代號"][17] = "市值"
+            stock[ing][17] = dfs2[1][1][0]
+
+            stock["股票代號"][18] = "股價"
+            stock[ing][18] = float(dfs2[0][1][0])
+
+            if stock[ing][18] > stock[ing][16]:  #與現有股價進行比對，檢視股票為高估或是低估
+                tmp = "高估"
+            else:
+                tmp = "低估"
+
+            stock["股票代號"][19] = "估值"
+            stock[ing][19] = tmp
+
+            stock["股票代號"][20] = "相差百分比"   #計算股價高估或低估的百分比
+            stock[ing][20] = str(round(100*(stock[ing][16]- stock[ing][18])/stock[ing][16]))+"%"
+        
+            
+            f= pd.merge(f,stock)
+
+        f.to_excel(writer, sheet_name=key, encoding='big5')
+            
+        # file = key+"23年 PE估值表.csv"  #將所有資料整合為csv檔輸出
+        # f.to_csv(file, encoding='big5')
+        print(f)
+        
 
 
